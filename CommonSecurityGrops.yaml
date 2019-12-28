@@ -1,0 +1,43 @@
+AWSTemplateFormatVersion: 2010-09-09
+Metadata:
+  License: Apache-2.0
+Parameters:
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Default: vpc-d0c8e1b7
+Resources:
+  CommonSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: CommonSecurityGroup
+      GroupDescription: Allow all port within having save secrity group
+      VpcId: !Ref VpcId
+      Tags:
+        - Key: Name
+          Value: CommonSecurityGroup
+  CommonSecurityGroupIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref CommonSecurityGroup
+      IpProtocol: -1
+      SourceSecurityGroupId: !Ref CommonSecurityGroup
+  CommonSecurityGroupEgress:
+    Type: AWS::EC2::SecurityGroupEgress
+    Properties:
+      GroupId: !Ref CommonSecurityGroup
+      IpProtocol: -1
+      SourceSecurityGroupId: !Ref CommonSecurityGroup
+  OutBoundFreeSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: OutBoundFreeSecurityGroup
+      GroupDescription: Allow all port to outbound
+      VpcId: !Ref VpcId
+      Tags:
+        - Key: Name
+          Value: OutBoundFreeSecurityGroup
+Outputs:
+  CommonSecurityGroup:
+    Value: !GetAtt CommonSecurityGroup.GroupId
+  OutBoundFreeSecurityGroup:
+    Value: !GetAtt OutBoundFreeSecurityGroup.GroupId
