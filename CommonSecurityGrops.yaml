@@ -36,8 +36,30 @@ Resources:
       Tags:
         - Key: Name
           Value: OutBoundFreeSecurityGroup
+  K8sMasterSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: K8sMasterSecurityGroup
+      GroupDescription: for k8s master node
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 6443
+          ToPort: 6443
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: K8sMasterSecurityGroup
 Outputs:
   CommonSecurityGroup:
     Value: !GetAtt CommonSecurityGroup.GroupId
+    Export:
+      Name: CommonSecurityGroup
   OutBoundFreeSecurityGroup:
     Value: !GetAtt OutBoundFreeSecurityGroup.GroupId
+    Export:
+      Name: OutBoundFreeSecurityGroup
+  K8sMasterSecurityGroup:
+    Value: !GetAtt K8sMasterSecurityGroup.GroupId
+    Export:
+      Name: K8sMasterSecurityGroup
