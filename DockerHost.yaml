@@ -1,0 +1,91 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Docker on EC2
+Parameters:
+  Subnet:
+    Type: AWS::EC2::Subnet::Id
+  SecurityGroupIds:
+    Type: List<AWS::EC2::SecurityGroup::Id>
+  IamInstanceProfile:
+    Type: String
+    Default: AmazonEC2RoleforSSM
+  Name:
+    Type: String
+    Default: DevContainerInstance
+Resources:
+  DockerHost:
+    Type: AWS::EC2::Instance
+    Metadata:
+      AWS::CloudFormation::Init:
+        config:
+          files:
+            /etc/cfn/cfn-hup.conf:
+              content: !Sub |
+                [main]
+                stack=${AWS::StackId}
+                region=${AWS::Region}
+            /etc/cfn/hooks.d/cfn-auto-reloader.conf:
+              content: !Sub |
+                [cfn-auto-reloader-hook]
+                triggers=post.update
+                path=Resources.DockerHost.Metadata.AWS::CloudFormation::Init
+                action=/opt/aws/bin/cfn-init -v --stack ${AWS::StackName} --resource DockerHost --region ${AWS::Region}
+            /etc/docker/daemon.json:
+              content: !Sub |
+                {
+                  "live-restore": true
+                }
+            /etc/cfn/scripts/Setup-config.sh:
+              content: |
+                # set hostname
+                hostnamectl set-hostname "${ProductName}-${Environment}-docker-host"
+                # set TimeZone --> JST
+                sed -i -e 's%^ZONE="UTC"%ZONE="Asia/Tokyo"%g' /etc/sysconfig/clock
+                cp /usr/share/zoneinfo/Asia/Tokyo /etc/localtime
+                # set LANG
+                localectl set-locale LANG=ja_JP.utf8 
+                source /etc/locale.conf
+                # set vm.max_map_count
+                sysctl -w vm.max_map_count=262144
+                echo "vm.max_map_count = 262144" >> /etc/sysctl.conf
+            /etc/cfn/scripts/Install-docker.sh:
+              content: |
+                #!/bin/bash
+                ## git
+                yum -y install git
+                ## docker
+                yum -y install docker
+                systemctl start docker
+                systemctl enable docker
+                # user settings
+                usermod -a -G docker ec2-user
+          commands:
+            1-setup-config:
+              command: "/bin/bash /etc/cfn/scripts/Setup-config.sh"
+              waitAfterCompletion: "0"
+            2-install-docker:
+              command: "/bin/bash /etc/cfn/scripts/Install-docker.sh"
+              waitAfterCompletion: "0"
+          services:
+            windows:
+              cfn-hup:
+                enabled: "true"
+                ensureRunning: "true"
+                files:
+                  - /etc/cfn/cfn-hup.conf
+                  - /etc/cfn/hooks.d/cfn-auto-reloader.conf
+    Properties:
+      ImageId: ami-068a6cefc24c301d2
+      IamInstanceProfile: !Ref IamInstanceProfile
+      InstanceType: t3.small
+      SecurityGroupIds: !Ref SecurityGroupIds
+      SubnetId: !Ref Subnet
+      Tags:
+        - Key: Name
+          Value: !Sub "${Name}"
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          yum update -y
+          # start cloud Init
+          /opt/aws/bin/cfn-init -v --stack ${AWS::StackName} --resource DockerHost --region ${AWS::Region}
+          /opt/aws/bin/cfn-signal -e $? --stack ${AWS::StackName} --resource DockerHost --region ${AWS::Region}
